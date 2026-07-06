@@ -37,6 +37,7 @@ class CIBlockPropertyAjaxScheme
 
 		$settings = self::getPropertySettings($arProperty);
 		$linkIblockId = (int)($settings['LINK_IBLOCK_ID'] ?? 0);
+		$articlePropCode = htmlspecialcharsbx((string)($settings['ARTICLE_PROPERTY_CODE'] ?? ''));
 		$fieldName = htmlspecialcharsbx((string)($strHTMLControlName['NAME'] ?? 'USER_TYPE_SETTINGS'));
 
 		$html = '<tr><td width="40%">'
@@ -66,6 +67,9 @@ class CIBlockPropertyAjaxScheme
 			. "\xD0\x98\xD1\x81\xD0\xBF\xD0\xBE\xD0\xBB\xD1\x8C\xD0\xB7\xD1\x83\xD0\xB5\xD1\x82\xD1\x81\xD1\x8F \xD0\xBF\xD1\x80\xD0\xB8 \xD0\xB2\xD1\x8B\xD0\xB1\xD0\xBE\xD1\x80\xD0\xB5 \xD1\x8D\xD0\xBB\xD0\xB5\xD0\xBC\xD0\xB5\xD0\xBD\xD1\x82\xD0\xB0 \xD0\xBA \xD1\x82\xD0\xBE\xD1\x87\xD0\xBA\xD0\xB5 \xD0\xBD\xD0\xB0 \xD0\xBA\xD0\xB0\xD1\x80\xD1\x82\xD0\xB8\xD0\xBD\xD0\xBA\xD0\xB5."
 			. '</div>';
 		$html .= '</td></tr>';
+		$html .= '<tr><td>Код свойства Артикул:</td><td>';
+		$html .= '<input type="text" name="'.$fieldName.'[ARTICLE_PROPERTY_CODE]" value="'.htmlspecialcharsbx($articlePropCode).'">';
+		$html .= '</td></tr>';
 
 		return $html;
 	}
@@ -80,6 +84,7 @@ class CIBlockPropertyAjaxScheme
 
 		return array(
 			'LINK_IBLOCK_ID' => (int)($settings['LINK_IBLOCK_ID'] ?? 0),
+			'ARTICLE_PROPERTY_CODE' => trim((string)($settings['ARTICLE_PROPERTY_CODE'] ?? '')),
 		);
 	}
 
@@ -306,6 +311,72 @@ class CIBlockPropertyAjaxScheme
 			$linkIblockId = self::getLinkIblockId($prop);
 			$payload = self::resolveValuePayloadFromRequest($prop, array());
 			$payload = self::mergePayloadWithStoredPoints($iblockId, $elementId, $propId, $payload);
+
+
+
+
+
+			$settings = self::getPropertySettings($prop);
+			$linkIblockId = (int)($settings['LINK_IBLOCK_ID'] ?? 0);
+			$articlePropCode = trim((string)($settings['ARTICLE_PROPERTY_CODE'] ?? ''));
+
+			if ($linkIblockId > 0 && $articlePropCode !== '') {
+				foreach ($points as &$point) {
+					$factoryNumber = trim((string)($point['factory_number'] ?? ''));
+					if ($factoryNumber === '') {
+						continue;
+					}
+
+					$foundElementId = self::findElementByArticle($linkIblockId, $articlePropCode, $factoryNumber);
+					if ($foundElementId <= 0) {
+						continue;
+					}
+
+					$elements = self::extractElementsFromPoint($point);
+
+					$exists = false;
+					foreach ($elements as $el) {
+						if ((int)$el['element_id'] === $foundElementId) {
+							$exists = true;
+							break;
+						}
+					}
+
+					$newElement = [
+						'element_id' => $foundElementId,
+						'element_title' => self::getElementTitle($linkIblockId, $foundElementId),
+					];
+
+					if (!$exists) {
+						// Добавляем в начало
+						array_unshift($elements, $newElement);
+					} else {
+						// Перемещаем в начало
+						foreach ($elements as $index => $el) {
+							if ((int)$el['element_id'] === $foundElementId) {
+								unset($elements[$index]);
+								break;
+							}
+						}
+						array_unshift($elements, $newElement);
+						// Переиндексация
+						$elements = array_values($elements);
+					}
+
+					// Обновляем элементы в точке
+					$point['elements'] = $elements;
+				}
+				unset($point);
+			}
+
+
+
+
+
+
+
+
+
 			$points = is_array($payload['points'] ?? null) ? $payload['points'] : array();
 
 			if (!$onlyPending && empty($points))
@@ -372,6 +443,66 @@ class CIBlockPropertyAjaxScheme
 			$linkIblockId = self::getLinkIblockId($prop);
 			$payload = self::resolveValuePayloadFromRequest($prop, array());
 			$payload = self::mergePayloadWithStoredPoints($iblockId, $elementId, $propId, $payload);
+
+
+
+
+
+			$settings = self::getPropertySettings($prop);
+			$linkIblockId = (int)($settings['LINK_IBLOCK_ID'] ?? 0);
+			$articlePropCode = trim((string)($settings['ARTICLE_PROPERTY_CODE'] ?? ''));
+
+			if ($linkIblockId > 0 && $articlePropCode !== '') {
+				foreach ($points as &$point) {
+					$factoryNumber = trim((string)($point['factory_number'] ?? ''));
+					if ($factoryNumber === '') {
+						continue;
+					}
+
+					$foundElementId = self::findElementByArticle($linkIblockId, $articlePropCode, $factoryNumber);
+					if ($foundElementId <= 0) {
+						continue;
+					}
+
+					$elements = self::extractElementsFromPoint($point);
+
+					$exists = false;
+					foreach ($elements as $el) {
+						if ((int)$el['element_id'] === $foundElementId) {
+							$exists = true;
+							break;
+						}
+					}
+
+					$newElement = [
+						'element_id' => $foundElementId,
+						'element_title' => self::getElementTitle($linkIblockId, $foundElementId),
+					];
+
+					if (!$exists) {
+						array_unshift($elements, $newElement);
+					} else {
+						foreach ($elements as $index => $el) {
+							if ((int)$el['element_id'] === $foundElementId) {
+								unset($elements[$index]);
+								break;
+							}
+						}
+						array_unshift($elements, $newElement);
+						$elements = array_values($elements);
+					}
+
+					$point['elements'] = $elements;
+				}
+				unset($point);
+			}
+
+
+
+
+
+
+
 
 			$arFields['PROPERTY_VALUES'][$propId][$rowKey] = array(
 				'VALUE' => self::encodeValuePayload((int)$fileId, $payload['points'], $linkIblockId),
@@ -2702,6 +2833,37 @@ class CIBlockPropertyAjaxScheme
 		{
 			\Bitrix\Iblock\PropertyIndex\Manager::updateElementIndex($iblockId, $elementId);
 		}
+	}
+
+	private static function findElementByArticle($iblockId, $articleCode, $articleValue)
+	{
+		$iblockId = (int)$iblockId;
+		$articleValue = trim((string)$articleValue);
+
+		if ($iblockId <= 0 || $articleCode === '' || $articleValue === '') {
+			return 0;
+		}
+
+		if (!\Bitrix\Main\Loader::includeModule('iblock')) {
+			return 0;
+		}
+
+		$rs = CIBlockElement::GetList(
+			[],
+			[
+				'IBLOCK_ID' => $iblockId,
+				'PROPERTY_' . $articleCode => $articleValue,
+			],
+			false,
+			['nTopCount' => 1],
+			['ID']
+		);
+
+		if ($row = $rs->Fetch()) {
+			return (int)$row['ID'];
+		}
+
+		return 0;
 	}
 }
 
